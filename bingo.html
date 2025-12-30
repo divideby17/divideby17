@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Probabilità Bingo</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; text-align: center; }
+        #grafico { width: 100%; max-width: 900px; height: 500px; margin: 0 auto; }
+        .info { color: #555; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <h2>Probabilità di fare Bingo (Singola Cartella)</h2>
+    <p class="info">Passa il mouse sulla linea per vedere i valori esatti.</p>
+    
+    <div id="grafico"></div>
+
+    <script>
+        // Funzione per calcolare la probabilità P(n)
+        // Formula semplificata: (n * (n-1) * ... * (n-14)) / (90 * 89 * ... * 76)
+        function calcolaProbabilita(n) {
+            if (n < 15) return 0;
+            if (n === 90) return 1;
+
+            let numeratore = 1;
+            let denominatore = 1;
+
+            // Calcoliamo il prodotto dei 15 termini necessari
+            for (let i = 0; i < 15; i++) {
+                numeratore *= (n - i);
+                denominatore *= (90 - i);
+            }
+
+            return numeratore / denominatore;
+        }
+
+        // Generiamo i dati da n=15 a n=90
+        let xValues = [];
+        let yValues = [];
+        let textValues = [];
+
+        for (let n = 1; n <= 90; n++) {
+            let p = calcolaProbabilita(n);
+            xValues.push(n);
+            yValues.push(p);
+            // Formattiamo il testo per il tooltip (percentuale con 4 decimali)
+            textValues.push(`Estrazione: ${n}<br>Probabilità: ${(p * 100).toFixed(6)}%`);
+        }
+
+        // Configurazione del Grafico Plotly
+        let trace = {
+            x: xValues,
+            y: yValues,
+            mode: 'lines',
+            text: textValues, // Testo che appare al passaggio del mouse
+            hoverinfo: 'text',
+            line: {
+                color: '#e74c3c',
+                width: 3
+            },
+            fill: 'tozeroy', // Riempie l'area sotto la curva
+            fillcolor: 'rgba(231, 76, 60, 0.1)'
+        };
+
+        let layout = {
+            title: 'Curva di Probabilità Cumulativa',
+            xaxis: {
+                title: 'Numero di Palline Estratte',
+                range: [15, 90]
+            },
+            yaxis: {
+                title: 'Probabilità (0-1)',
+                range: [0, 1.05]
+            }
+        };
+
+        Plotly.newPlot('grafico', [trace], layout);
+    </script>
+</body>
+</html>
