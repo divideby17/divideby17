@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spirografo Vettoriale - Final CCW</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            color: #ddd;
+            font-family: 'Consolas', 'Monaco', monospace;
+            width: 100vw;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* I canvas devono sovrapporsi perfettamente */
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #trailCanvas { z-index: 1; }
+        #armCanvas { z-index: 2; pointer-events: none; }
+
+        /* --- Pannello Controlli --- */
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(20, 20, 20, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.8);
+            z-index: 100;
+            width: 280px;
+            backdrop-filter: blur(5px);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        h3 { margin-top: 0; color: #00ffcc; text-transform: uppercase; font-size: 14px; letter-spacing: 2px; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px; }
+        .control-group { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 3px; font-size: 11px; color: #aaa; }
+        
+        /* Display Digitale */
+        .digital-display {
+            background-color: #111; border: 1px solid #333; color: #00ffcc;
+            font-size: 18px; padding: 8px; text-align: right; border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; margin-bottom: 5px;
+        }
+
+        /* UI Elements */
+        input[type=range] { width: 100%; cursor: pointer; accent-color: #00ffcc; margin: 5px 0; }
+        input[type=text] { width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 5px; border-radius: 3px; font-family: inherit; font-size: 12px; }
+        
+        /* Status message sotto gli input */
+        .status-msg { font-size: 10px; color: #666; margin-top: 2px; min-height: 14px; }
+
+        .quick-btn-container { display: flex; gap: 5px; margin-bottom: 5px; }
+        .quick-btn { background: #333; border: 1px solid #555; color: #ccc; padding: 2px 5px; font-size: 10px; cursor: pointer; border-radius: 3px; flex: 1; }
+        .quick-btn:hover { background: #444; color: white; }
+
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 20px; }
+        button.main-btn { padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 10px; color: #111; transition: filter 0.2s; }
+        button.main-btn:hover { filter: brightness(1.15); }
+
+        #btnPause { background-color: #00ffcc; }
+        #btnDir { background-color: #00ccff; }
+        #btnResetArms { background-color: #9933ff; color: white; }
+        #btnReset { background-color: #ff4444; color: white; }
+        
+        #btnViewReset, #btnClear { width: 100%; background-color: #333; color: white; padding: 8px; border: 1px solid #555; cursor: pointer; border-radius: 4px; text-transform: uppercase; font-size: 10px; margin-top: 8px;}
+        #btnViewReset:hover, #btnClear:hover { background-color: #444; }
+
+        .color-options { display: flex; gap: 10px; margin-bottom: 5px; }
+        .radio-label { display: flex; align-items: center; font-size: 11px; cursor: pointer; }
+        .radio-label input { margin-right: 5px; }
+        input[type=color] { width: 100%; height: 30px; border: none; background: none; cursor: pointer; padding: 0; }
+
+        #zoomInfo { position: fixed; bottom: 20px; right: 20px; color: #666; font-size: 12px; pointer-events: none; }
+        #perfWarning { position: fixed; bottom: 40px; right: 20px; color: #ffaa00; font-size: 11px; pointer-events: none; display: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="trailCanvas"></canvas>
+    <canvas id="armCanvas"></canvas>
+
+    <div id="controls">
+        <h3>Vector Engine 2.1</h3>
+
+        <div class="control-group">
+            <label>Rotazioni (Giri)</label>
+            <div id="rotCounter" class="digital-display">0.00</div>
+        </div>
+        
+        <div class="control-group">
+            <label>Colore</label>
+            <div class="color-options">
+                <label class="radio-label"><input type="radio" name="colorMode" value="rainbow" checked onchange="updateColorMode()"> Rainbow</label>
+                <label class="radio-label"><input type="radio" name="colorMode" value="single" onchange="updateColorMode()"> Singolo</label>
+            </div>
+            <div id="singleColorContainer" style="opacity: 0.3; pointer-events: none;">
+                <input type="color" id="colorPicker" value="#00ffcc">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Rapporto Rotazione</label>
+            <div class="quick-btn-container">
+                <button class="quick-btn" onclick="setPreset('pi')">π</button>
+                <button class="quick-btn" onclick="setPreset('e')">e</button>
+                <button class="quick-btn" onclick="setPreset('1.618')">φ</button>
+            </div>
+            <input type="text" id="ratioInput" value="2.0">
+            <div id="ratioStatus" class="status-msg">Valore: 2.00000</div>
+        </div>
+
+        <div class="control-group">
+            <label>Velocità</label>
+            <input type="range" id="speed" min="0.1" max="10" step="0.1" value="2">
+        </div>
+        <div class="control-group">
+            <label>Lunghezza</label>
+            <input type="range" id="length" min="50" max="300" step="10" value="150">
+        </div>
+
+        <div class="action-grid">
+            <button id="btnPause" class="main-btn" onclick="togglePause()">Riprendi</button>
+            <button id="btnDir" class="main-btn" onclick="toggleDirection()">⟲ Antiorario</button>
+            <button id="btnResetArms" class="main-btn" onclick="resetArmsOnly()">Reset Aste</button>
+            <button id="btnReset" class="main-btn" onclick="fullReset()">Reset All</button>
+        </div>
+        
+        <button id="btnClear" onclick="clearTrail()">Pulisci Traccia</button>
+        <button id="btnViewReset" onclick="resetView()">Centra Vista</button>
+    </div>
+
+    <div id="zoomInfo">Zoom: 100% | Points: 0</div>
+    <div id="perfWarning">⚠️ Buffer High</div>
+
+    <script>
+        const trailCanvas = document.getElementById('trailCanvas');
+        const armCanvas = document.getElementById('armCanvas');
+        const ctxTrail = trailCanvas.getContext('2d', { alpha: false });
+        const ctxArm = armCanvas.getContext('2d');
+        const ratioStatus = document.getElementById('ratioStatus');
+        
+        // --- DATA STORE ---
+        const MAX_POINTS = 100000; 
+        let pointsBuffer = []; 
+        
+        // --- VIEW ---
+        let camera = { x: 0, y: 0, zoom: 1 };
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let cameraStart = { x: 0, y: 0 };
+
+        // --- FISICA ---
+        let width, height, centerX, centerY;
+        let angle1 = 0, angle2 = 0, angleOffset = 0;
+        
+        // MODIFICATO QUI: direction = -1 (Antiorario di default)
+        let isPaused = true, direction = -1; 
+        
+        let isRainbowMode = true, fixedColor = "#00ffcc";
+        let baseSpeed = 0.04, speedMultiplier = 2.0, rodLength = 150;
+        const STEPS_PER_FRAME = 20; 
+
+        // --- INIT & RESIZE ---
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            trailCanvas.width = width;
+            trailCanvas.height = height;
+            armCanvas.width = width;
+            armCanvas.height = height;
+            centerX = width / 2;
+            centerY = height / 2;
+            renderScene(); 
+        }
+        window.addEventListener('resize', resize);
+
+        // --- GESTIONE INPUT (Zoom/Pan) ---
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const factor = (e.deltaY > 0 ? -1 : 1) * 0.1;
+            const mouseX = e.clientX - centerX;
+            const mouseY = e.clientY - centerY;
+            const worldMouseX = (mouseX - camera.x) / camera.zoom;
+            const worldMouseY = (mouseY - camera.y) / camera.zoom;
+
+            let newZoom = Math.min(Math.max(0.1, camera.zoom * (1 + factor)), 500);
+            
+            camera.x = mouseX - worldMouseX * newZoom;
+            camera.y = mouseY - worldMouseY * newZoom;
+            camera.zoom = newZoom;
+            renderScene();
+        }, { passive: false });
+
+        window.addEventListener('mousedown', (e) => {
+            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+            isDragging = true;
+            dragStart = { x: e.clientX, y: e.clientY };
+            cameraStart = { x: camera.x, y: camera.y };
+            document.body.style.cursor = 'grabbing';
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; document.body.style.cursor = 'default'; });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            camera.x = cameraStart.x + (e.clientX - dragStart.x);
+            camera.y = cameraStart.y + (e.clientY - dragStart.y);
+            renderScene();
+        });
+
+        function resetView() { camera = { x: 0, y: 0, zoom: 1 }; renderScene(); }
+
+        // --- MOTORE DI RENDERING ---
+        function renderScene() {
+            // 1. Reset trasformazioni e pulizia
+            ctxTrail.setTransform(1, 0, 0, 1, 0, 0);
+            ctxTrail.fillStyle = '#050505';
+            ctxTrail.fillRect(0, 0, width, height);
+            
+            ctxArm.setTransform(1, 0, 0, 1, 0, 0);
+            ctxArm.clearRect(0, 0, width, height);
+
+            // 2. Applicazione Camera
+            ctxTrail.translate(centerX + camera.x, centerY + camera.y);
+            ctxTrail.scale(camera.zoom, camera.zoom);
+            
+            ctxArm.translate(centerX + camera.x, centerY + camera.y);
+            ctxArm.scale(camera.zoom, camera.zoom);
+
+            // 3. Disegno Traccia
+            if (pointsBuffer.length > 1) {
+                ctxTrail.lineCap = 'round';
+                ctxTrail.lineJoin = 'round';
+                ctxTrail.lineWidth = 1.5 / camera.zoom; 
+
+                if (!isRainbowMode) {
+                    ctxTrail.strokeStyle = fixedColor;
+                    ctxTrail.beginPath();
+                    ctxTrail.moveTo(pointsBuffer[0].x, pointsBuffer[0].y);
+                    for (let i = 1; i < pointsBuffer.length; i++) {
+                        ctxTrail.lineTo(pointsBuffer[i].x, pointsBuffer[i].y);
+                    }
+                    ctxTrail.stroke();
+                } else {
+                    let batchSize = 100; 
+                    for (let i = 0; i < pointsBuffer.length - 1; i += batchSize) {
+                        ctxTrail.beginPath();
+                        ctxTrail.strokeStyle = `hsl(${pointsBuffer[i].h}, 100%, 60%)`;
+                        ctxTrail.moveTo(pointsBuffer[i].x, pointsBuffer[i].y);
+                        let limit = Math.min(i + batchSize + 1, pointsBuffer.length);
+                        for (let j = i + 1; j < limit; j++) {
+                            ctxTrail.lineTo(pointsBuffer[j].x, pointsBuffer[j].y);
+                        }
+                        ctxTrail.stroke();
+                    }
+                }
+            }
+
+            // 4. Disegno Aste
+            drawArms();
+            
+            updateUI();
+        }
+
+        function drawArms() {
+            const x1 = rodLength * Math.cos(angle1);
+            const y1 = rodLength * Math.sin(angle1);
+            const x2 = x1 + rodLength * Math.cos(angle2);
+            const y2 = y1 + rodLength * Math.sin(angle2);
+
+            const scale = 1 / camera.zoom;
+
+            ctxArm.lineWidth = 2 * scale;
+            ctxArm.strokeStyle = '#ffffff';
+            ctxArm.lineCap = 'round';
+
+            ctxArm.beginPath();
+            ctxArm.moveTo(0, 0);
+            ctxArm.lineTo(x1, y1);
+            ctxArm.lineTo(x2, y2);
+            ctxArm.stroke();
+
+            // Snodi
+            const r = 4 * scale;
+            ctxArm.fillStyle = '#00ffcc';
+            ctxArm.beginPath(); ctxArm.arc(0, 0, r, 0, Math.PI*2); ctxArm.fill();
+            ctxArm.beginPath(); ctxArm.arc(x1, y1, r, 0, Math.PI*2); ctxArm.fill();
+            
+            ctxArm.fillStyle = isRainbowMode ? '#ff0055' : fixedColor;
+            ctxArm.beginPath(); ctxArm.arc(x2, y2, r * 1.2, 0, Math.PI*2); ctxArm.fill();
+        }
+
+        function updateUI() {
+            document.getElementById('zoomInfo').innerText = `Zoom: ${Math.round(camera.zoom * 100)}% | Pts: ${pointsBuffer.length}`;
+            document.getElementById('perfWarning').style.display = pointsBuffer.length > 50000 ? 'block' : 'none';
+        }
+
+        // --- ANIMAZIONE ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (isPaused) return;
+
+            const stepSpeed1 = (baseSpeed * direction) / STEPS_PER_FRAME;
+            const stepSpeed2 = ((baseSpeed * speedMultiplier) * direction) / STEPS_PER_FRAME;
+
+            for (let i = 0; i < STEPS_PER_FRAME; i++) {
+                angle1 += stepSpeed1;
+                angle2 += stepSpeed2;
+
+                const curX = (rodLength * Math.cos(angle1)) + (rodLength * Math.cos(angle2));
+                const curY = (rodLength * Math.sin(angle1)) + (rodLength * Math.sin(angle2));
+                
+                pointsBuffer.push({ x: curX, y: curY, h: (angle1 * 15) % 360 });
+            }
+
+            if (pointsBuffer.length > MAX_POINTS) pointsBuffer.splice(0, STEPS_PER_FRAME);
+
+            const adjustedAngle = angle1 - angleOffset;
+            document.getElementById('rotCounter').innerText = (Math.abs(adjustedAngle) / (2 * Math.PI)).toFixed(2);
+
+            renderScene();
+        }
+
+        // --- AZIONI ---
+        window.togglePause = () => {
+            isPaused = !isPaused;
+            const btn = document.getElementById('btnPause');
+            btn.innerText = isPaused ? "Riprendi" : "Pausa";
+            btn.style.backgroundColor = isPaused ? "#00ffcc" : "#ffcc00";
+            if(isPaused) renderScene();
+        };
+
+        window.toggleDirection = () => { direction *= -1; document.getElementById('btnDir').innerText = direction === 1 ? "⟳ Orario" : "⟲ Antiorario"; };
+        
+        window.resetArmsOnly = () => {
+            angle1 = 0; angle2 = 0; angleOffset = 0;
+            document.getElementById('rotCounter').innerText = "0.00";
+            renderScene();
+        };
+
+        window.fullReset = () => {
+            pointsBuffer = [];
+            angle1 = 0; angle2 = 0; angleOffset = 0;
+            camera = { x: 0, y: 0, zoom: 1 };
+            isPaused = true;
+            document.getElementById('btnPause').innerText = "Riprendi";
+            document.getElementById('btnPause').style.backgroundColor = "#00ffcc";
+            document.getElementById('rotCounter').innerText = "0.00";
+            renderScene();
+        };
+
+        window.clearTrail = () => {
+            pointsBuffer = [];
+            angleOffset = angle1;
+            renderScene();
+        };
+
+        window.setPreset = (v) => { document.getElementById('ratioInput').value = v; updateRatio(); };
+        
+        function updateRatio() {
+            let val = document.getElementById('ratioInput').value.toLowerCase();
+            let num = parseFloat(val);
+            if (val.includes('pi') || val.includes('π')) num = Math.PI;
+            if (val.includes('e')) num = Math.E;
+            if (val.includes('phi')) num = 1.61803398875;
+            if (val.includes('/')) { const p = val.split('/'); num = parseFloat(p[0])/parseFloat(p[1]); }
+            
+            if (!isNaN(num)) { 
+                speedMultiplier = num; 
+                ratioStatus.innerText = "Valore: " + num.toFixed(5);
+                ratioStatus.style.color = "#00ffcc";
+                if(isPaused) renderScene(); 
+            } else {
+                ratioStatus.innerText = "Non valido";
+                ratioStatus.style.color = "#ff4444";
+            }
+        }
+
+        window.updateColorMode = () => {
+            isRainbowMode = document.querySelector('input[name="colorMode"]:checked').value === 'rainbow';
+            document.getElementById('singleColorContainer').style.opacity = isRainbowMode ? "0.3" : "1.0";
+            renderScene();
+        };
+
+        document.getElementById('colorPicker').addEventListener('input', (e) => { fixedColor = e.target.value; if(!isRainbowMode) renderScene(); });
+        document.getElementById('speed').addEventListener('input', (e) => { baseSpeed = parseFloat(e.target.value) * 0.02; });
+        document.getElementById('ratioInput').addEventListener('change', updateRatio);
+        document.getElementById('length').addEventListener('input', (e) => { rodLength = parseInt(e.target.value); renderScene(); });
+
+        // Start
+        resize();
+        updateRatio();
+        renderScene();
+        animate();
+
+    </script>
+</body>
+</html>
