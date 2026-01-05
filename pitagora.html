@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dimostrazione Pitagora - Step 1</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h2 { margin-bottom: 10px; }
+        .description { max-width: 600px; text-align: center; margin-bottom: 20px; }
+        
+        /* Stile del contenitore SVG */
+        #proof-container {
+            background: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        svg {
+            border: 2px solid #333; /* Il bordo del quadrato grande (a+b) */
+            background-color: #eee; /* Colore di sfondo se ci fossero buchi */
+        }
+
+        /* Stili per gli elementi geometrici */
+        .triangle {
+            fill: #3498db; /* Blu per i triangoli */
+            stroke: #2980b9;
+            stroke-width: 2;
+            transition: all 0.8s ease-in-out; /* Preparazione per future animazioni */
+        }
+        
+        .c-square {
+            fill: #e74c3c; /* Rosso per il quadrato c^2 */
+            stroke: #c0392b;
+            stroke-width: 2;
+        }
+
+        /* Stile per i testi (a, b, c2) */
+        text {
+            font-family: sans-serif;
+            font-weight: bold;
+            fill: white;
+            pointer-events: none; /* Evita che il testo interferisca col mouse */
+        }
+        .label-ab { fill: #fff; font-size: 18px;}
+        .label-c2 { fill: #fff; font-size: 36px; }
+
+    </style>
+</head>
+<body>
+
+    <h2>Dimostrazione Visiva: Step 1</h2>
+    <p class="description">
+        Abbiamo un grande quadrato con lato pari alla somma dei cateti (a + b).<br>
+        Disponiamo 4 triangoli rettangoli identici negli angoli.<br>
+        Lo spazio rimanente al centro è un quadrato perfetto di lato <strong>c</strong> (l'ipotenusa).
+    </p>
+
+    <div id="proof-container">
+        <svg id="main-svg" width="500" height="500" viewBox="0 0 500 500"></svg>
+    </div>
+
+    <script>
+        // --- CONFIGURAZIONE ---
+        // Definiamo le lunghezze dei cateti 'a' e 'b'
+        // La somma a + b deve essere uguale alla dimensione del viewBox (500 nel nostro caso)
+        const a = 150; 
+        const b = 350; 
+        const totalSize = a + b; // 500
+
+        const svg = document.getElementById('main-svg');
+
+        // Funzione helper per creare elementi SVG
+        function createSVGElement(type, attributes) {
+            const elem = document.createElementNS("http://www.w3.org/2000/svg", type);
+            for (const key in attributes) {
+                elem.setAttributeNS(null, key, attributes[key]);
+            }
+            return elem;
+        }
+
+        function drawInitialState() {
+            svg.innerHTML = ''; // Pulisce l'SVG
+
+            // 1. Definiamo le coordinate dei 4 triangoli negli angoli
+            // Usiamo i path SVG per poterli muovere facilmente dopo
+            
+            // Triangolo in alto a sinistra (cateti sugli assi)
+            const t1Path = `M 0 0 L 0 ${b} L ${a} 0 Z`;
+            // Triangolo in alto a destra
+            const t2Path = `M ${a} 0 L ${totalSize} 0 L ${totalSize} ${a} Z`;
+            // Triangolo in basso a destra
+            const t3Path = `M ${totalSize} ${a} L ${totalSize} ${totalSize} L ${b} ${totalSize} Z`;
+            // Triangolo in basso a sinistra
+            const t4Path = `M ${b} ${totalSize} L 0 ${totalSize} L 0 ${b} Z`;
+
+            // 2. Aggiungiamo i triangoli all'SVG
+            const tri1 = createSVGElement('path', { d: t1Path, class: 'triangle', id: 't1' });
+            const tri2 = createSVGElement('path', { d: t2Path, class: 'triangle', id: 't2' });
+            const tri3 = createSVGElement('path', { d: t3Path, class: 'triangle', id: 't3' });
+            const tri4 = createSVGElement('path', { d: t4Path, class: 'triangle', id: 't4' });
+            
+            svg.appendChild(tri1);
+            svg.appendChild(tri2);
+            svg.appendChild(tri3);
+            svg.appendChild(tri4);
+
+            // 3. Disegniamo il quadrato centrale c^2
+            // I suoi vertici sono i punti di contatto delle ipotenuse
+            const cSquarePath = `M ${a} 0 L ${totalSize} ${a} L ${b} ${totalSize} L 0 ${b} Z`;
+            const cSquare = createSVGElement('path', { d: cSquarePath, class: 'c-square', id: 'cSquare' });
+            svg.appendChild(cSquare);
+
+            // 4. Aggiungiamo le etichette (opzionale, per chiarezza)
+            addLabels();
+        }
+
+        function addLabels() {
+            // Etichetta c^2 al centro
+            const textC2 = createSVGElement('text', { x: totalSize/2, y: totalSize/2, 'text-anchor': 'middle', 'dominant-baseline': 'middle', class: 'label-c2' });
+            textC2.textContent = "c²";
+            svg.appendChild(textC2);
+
+            // Esempio di etichette 'a' e 'b' sul primo triangolo
+            const labelA1 = createSVGElement('text', { x: a/2, y: 20, 'text-anchor': 'middle', class: 'label-ab' });
+            labelA1.textContent = "a";
+            svg.appendChild(labelA1);
+            
+            const labelB1 = createSVGElement('text', { x: 20, y: b/2, 'text-anchor': 'middle', 'dominant-baseline': 'middle', class: 'label-ab' });
+            labelB1.textContent = "b";
+            svg.appendChild(labelB1);
+        }
+
+        // Avvia il disegno iniziale
+        drawInitialState();
+
+    </script>
+</body>
+</html>
